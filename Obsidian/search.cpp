@@ -666,39 +666,28 @@ namespace Search {
     // Probe tablebases
     const TbResult tbResult = (IsRoot || excludedMove) ? TB_RESULT_FAILED : probeTB(pos);
 
-    if (tbResult != TB_RESULT_FAILED) {
+   // if (tbResult != TB_RESULT_FAILED) {
+if (tbResult != TB_RESULT_FAILED) {
+  ++tbHits;
 
-      tbHits++;
-      Score tbScore;
-      TT::Flag tbBound;
+  // Combine variable initialization and calculation
+  Score tbScore = (tbResult == TB_LOSS) ? (ply - SCORE_TB_WIN) : (SCORE_TB_WIN - ply);
+  TT::Flag tbBound = (tbResult == TB_LOSS) ? TT::FLAG_UPPER : TT::FLAG_LOWER;
 
-      if (tbResult == TB_LOSS) {
-        tbScore = ply - SCORE_TB_WIN;
-        tbBound = TT::FLAG_UPPER;
-      }
-      else if (tbResult == TB_WIN) {
-        tbScore = SCORE_TB_WIN - ply;
-        tbBound = TT::FLAG_LOWER;
-      }
-      else {
-        tbScore = SCORE_DRAW;
-        tbBound = TT::FLAG_EXACT;
-      }
+  // Early return for exact or prune conditions
+  if ((tbBound == TT::FLAG_EXACT) ||
+      (tbBound == TT::FLAG_LOWER ? tbScore >= beta : tbScore <= alpha)) {
+    ttEntry->store(pos.key, tbBound, depth, MOVE_NONE, tbScore, SCORE_NONE, ttPV, ply);
+    return tbScore;
+  }
 
-      if ((tbBound == TT::FLAG_EXACT) || (tbBound == TT::FLAG_LOWER ? tbScore >= beta : tbScore <= alpha)) {
-        ttEntry->store(pos.key, tbBound, depth, MOVE_NONE, tbScore, SCORE_NONE, ttPV, ply);
-        return tbScore;
-      }
+  // Update best score and alpha/beta if on PV
+  if (IsPV) {
+    bestScore = std::max(bestScore, (tbBound == TT::FLAG_LOWER) ? tbScore : maxScore);
+    alpha = std::max(alpha, bestScore);
+  }
+}
 
-      if (IsPV) {
-        if (tbBound == TT::FLAG_LOWER) {
-          bestScore = tbScore;
-          alpha = std::max(alpha, bestScore);
-        } else {
-          maxScore = tbScore;
-        }
-      }
-    }
 
     (ss + 1)->killerMove = MOVE_NONE;
     ss->doubleExt = (ss - 1)->doubleExt;
